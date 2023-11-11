@@ -61,3 +61,6 @@ fun Box.getFace(direction: Direction): Face {
     }
 }
 
+operator fun Vec3d.component1() = x
+operator fun Vec3d.component2() = y
+operator fun Vec3d.component3() = z

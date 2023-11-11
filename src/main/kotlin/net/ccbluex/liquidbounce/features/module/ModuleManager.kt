@@ -86,6 +86,7 @@ object ModuleManager : Listenable, Iterable<Module> by modules {
             ModuleVelocity,
             ModuleBacktrack,
             ModuleSwordBlock,
+            ModuleTpAura,
 
             // Exploit
             ModuleAbortBreaking,
