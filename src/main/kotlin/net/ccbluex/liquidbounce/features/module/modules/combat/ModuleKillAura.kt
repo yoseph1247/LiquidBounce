@@ -42,7 +42,6 @@ import net.ccbluex.liquidbounce.utils.entity.*
 import net.ccbluex.liquidbounce.utils.item.InventoryTracker
 import net.ccbluex.liquidbounce.utils.item.openInventorySilently
 import net.ccbluex.liquidbounce.utils.kotlin.random
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
 import net.ccbluex.liquidbounce.utils.render.WorldTargetRenderer
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen
 import net.minecraft.client.util.math.MatrixStack
@@ -77,7 +76,7 @@ import kotlin.random.Random
 object ModuleKillAura : Module("KillAura", Category.COMBAT) {
 
     // Attack speed
-    private val cps by intRange("CPS", 5..8, 1..20)
+    private val cpsScheduler = tree(CpsScheduler())
 
     object Cooldown : ToggleableConfigurable(this, "Cooldown", true) {
 
@@ -226,7 +225,7 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
 
     private object FailSwing : ToggleableConfigurable(this, "FailSwing", false) {
         object UseOwnCPS : ToggleableConfigurable(ModuleKillAura, "UseOwnCPS", true) {
-            val cps by intRange("CPS", 5..8, 0..20)
+            val scheduler = tree(CpsScheduler())
         }
 
         object LimitRange : ToggleableConfigurable(ModuleKillAura, "LimitRange", false) {
@@ -250,8 +249,8 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
             val shouldSwing = entity != null && !entity.isRemoved &&
                 (!enabled || entity.boxedDistanceTo(player) <= reach)
 
-            val chosenCPS = if (enabled) UseOwnCPS.cps else cps
-            val clicks = cpsTimer.clicks({ shouldSwing }, chosenCPS)
+            val chosenScheduler = if (enabled) UseOwnCPS.scheduler else cpsScheduler
+            val clicks = chosenScheduler.clicks { shouldSwing }
 
             prepareAttackEnvironment {
                 repeat(clicks) {
@@ -305,8 +304,6 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
 
     private val ignoreOpenInventory by boolean("IgnoreOpenInventory", true)
     private val simulateInventoryClosing by boolean("SimulateInventoryClosing", true)
-
-    private val cpsTimer = tree(CpsScheduler())
 
     private val boxFadeSeconds
         get() = 50 * NotifyWhenFail.Box.fadeSeconds
@@ -460,10 +457,10 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
             }
 
             // Attack enemy according to cps and cooldown
-            val clicks = cpsTimer.clicks({ checkIfReadyToAttack(chosenEntity) }, cps)
+            val clicks = cpsScheduler.clicks { checkIfReadyToAttack(chosenEntity) }
 
             if (clicks == 0) {
-                if (cpsTimer.isClickOnNextTick(AutoBlock.tickOff)) {
+                if (cpsScheduler.isClickOnNextTick(AutoBlock.tickOff)) {
                     AutoBlock.stopBlocking()
                     return@repeatable
                 }
@@ -474,6 +471,11 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
 
             prepareAttackEnvironment {
                 repeat(clicks) {
+                    // Check if we are still ready to attack
+                    if (!checkIfReadyToAttack(chosenEntity)) {
+                        return@repeat
+                    }
+
                     // Fail rate
                     if (failRate > 0 && failRate > Random.nextInt(100)) {
                         // Fail rate should always make sure to swing the hand, so the server-side knows you missed the enemy.
@@ -517,7 +519,7 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
                 continue
             }
 
-            val (eyes, nextPoint, box, cutOffBox) = pointTracker.gatherPoint(target, cpsTimer.isClickOnNextTick(1))
+            val (eyes, nextPoint, box, cutOffBox) = pointTracker.gatherPoint(target, cpsScheduler.isClickOnNextTick(1))
             val rotationPreference = LeastDifferencePreference(RotationManager.serverRotation, nextPoint)
 
             // find best spot
@@ -538,7 +540,7 @@ object ModuleKillAura : Module("KillAura", Category.COMBAT) {
         }
     }
 
-    fun checkIfReadyToAttack(choosenEntity: Entity): Boolean {
+    private fun checkIfReadyToAttack(choosenEntity: Entity): Boolean {
         val critical = !ModuleCriticals.shouldWaitForCrit() || choosenEntity.velocity.lengthSquared() > 0.25 * 0.25
         val shielding = attackShielding || choosenEntity !is PlayerEntity || player.mainHandStack.item is AxeItem ||
             !choosenEntity.wouldBlockHit(player)

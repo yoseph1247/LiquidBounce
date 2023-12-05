@@ -77,13 +77,13 @@ import kotlin.random.Random
  * Places blocks under you.
  */
 object ModuleScaffold : Module("Scaffold", Category.WORLD) {
+
     object SimulatePlacementAttempts : ToggleableConfigurable(this, "SimulatePlacementAttempts", false) {
-        val cps by intRange("CPS", 5..8, 0..50)
 
+        val cpsScheduler = tree(CpsScheduler())
         val failedAttemptsOnly by boolean("FailedAttemptsOnly", true)
-    }
 
-    private val cpsScheduler = tree(CpsScheduler())
+    }
 
     private val silent by boolean("Silent", true)
     private val slotResetDelay by int("SlotResetDelay", 5, 0..40)
@@ -318,10 +318,9 @@ object ModuleScaffold : Module("Scaffold", Category.WORLD) {
             arrayOf(Hand.MAIN_HAND, Hand.OFF_HAND).firstOrNull { isValidBlock(player.getStackInHand(it)) }
 
         repeat(
-            cpsScheduler.clicks(
-                { simulatePlacementAttempts(currentCrosshairTarget, suitableHand) && player.moving },
-                SimulatePlacementAttempts.cps,
-            ),
+            SimulatePlacementAttempts.cpsScheduler.clicks {
+                simulatePlacementAttempts(currentCrosshairTarget, suitableHand) && player.moving
+            },
         ) {
             // By the time this reaches here, the variables are already non-null
             if (!viaFabricFailPlace()) {

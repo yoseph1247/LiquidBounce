@@ -45,7 +45,7 @@ import kotlin.math.cos
 
 object ModuleProjectilePuncher : Module("ProjectilePuncher", Category.WORLD) {
 
-    private val cps by intRange("CPS", 5..8, 1..20)
+    private val cpsTimer = tree(CpsScheduler())
     private val swing by boolean("Swing", true)
     private val range by float("Range", 3f, 3f..6f)
     private val ignoreOpenInventory by boolean("IgnoreOpenInventory", true)
@@ -55,8 +55,6 @@ object ModuleProjectilePuncher : Module("ProjectilePuncher", Category.WORLD) {
 
     // Rotation
     private val rotations = tree(RotationsConfigurable())
-
-    private val cpsTimer = tree(CpsScheduler())
 
     override fun disable() {
         targetTracker.cleanup()
@@ -78,7 +76,7 @@ object ModuleProjectilePuncher : Module("ProjectilePuncher", Category.WORLD) {
                 toEntity = target, rotation = RotationManager.serverRotation, range = range.toDouble(),
                 wallsRange = 0.0
             )
-        val clicks = cpsTimer.clicks(condition = { condition }, cps)
+        val clicks = cpsTimer.clicks { condition }
 
         repeat(clicks) {
             target.attack(swing)

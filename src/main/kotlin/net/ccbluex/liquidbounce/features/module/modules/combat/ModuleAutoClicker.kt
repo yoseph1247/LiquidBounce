@@ -35,20 +35,18 @@ import net.minecraft.util.hit.HitResult
 object ModuleAutoClicker : Module("AutoClicker", Category.COMBAT) {
 
     object Left : ToggleableConfigurable(this, "Left", true) {
-        val cps by intRange("CPS", 5..8, 1..20)
+        val cpsScheduler = tree(CpsScheduler())
         val cooldown by boolean("Cooldown", true)
     }
 
     object Right : ToggleableConfigurable(this, "Right", false) {
-        val cps by intRange("CPS", 5..8, 1..20)
+        val cpsScheduler = tree(CpsScheduler())
     }
 
     init {
         tree(Left)
         tree(Right)
     }
-
-    val cpsScheduler = tree(CpsScheduler())
 
     val attack: Boolean
         get() = mc.options.attackKey.isPressed
@@ -60,15 +58,17 @@ object ModuleAutoClicker : Module("AutoClicker", Category.COMBAT) {
         get() = player.abilities.creativeMode || mc.crosshairTarget?.type != HitResult.Type.BLOCK
 
     val tickHandler = repeatable {
-        Left.let {
-            repeat(cpsScheduler.clicks({ it.enabled && attack && shouldTargetBlock &&
-                (!it.cooldown || player.getAttackCooldownProgress(0.0f) >= 1.0f) }, it.cps)) {
+        Left.run {
+            repeat(cpsScheduler.clicks {
+                enabled && attack && shouldTargetBlock &&
+                    (!cooldown || player.getAttackCooldownProgress(0.0f) >= 1.0f)
+            }) {
                 KeyBinding.onKeyPressed(mc.options.attackKey.boundKey)
             }
         }
 
-        Right.let {
-            repeat(cpsScheduler.clicks({ it.enabled && use }, it.cps)) {
+        Right.run {
+            repeat(cpsScheduler.clicks { enabled && use }) {
                 KeyBinding.onKeyPressed(mc.options.useKey.boundKey)
             }
         }

@@ -39,24 +39,21 @@ import kotlin.random.Random
  */
 object ModuleTrigger : Module("Trigger", Category.COMBAT) {
 
-    // CPS means clicks per second
-    val cps by intRange("CPS", 5..8, 1..20)
+    val cpsTimer = tree(CpsScheduler())
     val cooldown by boolean("Cooldown", true)
     val failRate by int("FailRate", 0, 0..100)
     val onItemUse by enumChoice("OnItemUse", Use.WAIT, Use.values())
     val weapon by enumChoice("Weapon", Weapon.ANY, Weapon.values())
     val delayPostStopUse by int("DelayPostStopUse", 0, 0..20)
 
-    private val cpsTimer = tree(CpsScheduler())
-
     val repeatable = repeatable {
         val crosshair = mc.crosshairTarget
 
         if (crosshair is EntityHitResult && crosshair.entity.shouldBeAttacked()) {
-            val clicks = cpsTimer.clicks(
-                condition = { (!cooldown || player.getAttackCooldownProgress(0.0f) >= 1.0f) && isWeaponSelected() && !ModuleCriticals.shouldWaitForCrit() },
-                cps
-            )
+            val clicks = cpsTimer.clicks {
+                (!cooldown || player.getAttackCooldownProgress(0.0f) >= 1.0f) &&
+                    isWeaponSelected() && !ModuleCriticals.shouldWaitForCrit()
+            }
 
             repeat(clicks) {
                 if (player.usingItem) {
